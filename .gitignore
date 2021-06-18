@@ -7,10 +7,10 @@ yarn-error.log*
 lerna-debug.log*
 
 # Token, Databases
-.token
-.banned-users
-.server-prefix
-.users
+.token.json
+.banned-users.json
+.server-prefix.json
+.users.json
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
