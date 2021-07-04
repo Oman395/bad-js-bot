@@ -28,10 +28,11 @@ const help_embed = new Discord.MessageEmbed()
     .addField('Ping', 'API latency and bot latency, bot latency not 100% accurate.')
     .addField('Prefix', 'Sets server prefix, or tells prefix if no prefix.')
     .addField('Subreddit', 'sends a random post from that subreddit.')
+    .addField('Wolfram', 'asks wolfram|alpha for the answer.')
     .addField('Server(un)ban', 'locally bans user from bot.')
-    .addField('(Un)ban', 'Bans user mentioned from server.')
-    .addField('Kick', 'Kicks user mentioned from server.')
-    .addField('Contact AutisticMOFO#1337', 'For more details.')
+    .addField('(Un)ban', 'bans user mentioned from server.')
+    .addField('Kick', 'kicks user mentioned from server.')
+    .addField('Contact AutisticMOFO#1337', 'for more details.')
 client.once('ready', () => {
     console.log('Ready!');
 });
