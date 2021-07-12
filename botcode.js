@@ -1,10 +1,7 @@
 const token = require('./token.json');
+const db = require('quick.db');
 const Discord = require('discord.js');
-const fs = require('fs');
-const WolframAlphaAPI = require('wolfram-alpha-api');
-const waApi = WolframAlphaAPI("394UE3-XXTQ2LK7LH");
 const Memer = require("random-jokes-api");
-const posts = require('./getcontent.js');
 const client = new Discord.Client();
 const snoowrap = require('snoowrap');
 var result;
@@ -12,13 +9,21 @@ const { SSL_OP_EPHEMERAL_RSA, SSL_OP_SSLEAY_080_CLIENT_DH_BUG } = require('const
 const { time } = require('console');
 const { Submission, Subreddit } = require('snoowrap');
 const { fromJSON } = require('tough-cookie');
-var prefix;
+if (!db.has("userDB")) {
+    db.set('userDB', {});
+}
+if (!db.has("serverDB")) {
+    db.set('serverDB', {});
+}
 const r = new snoowrap({
     userAgent: token.userAgent,
     clientId: token.clientId,
     clientSecret: token.clientSecret,
     username: token.username,
     password: token.password
+});
+client.once('ready', () => {
+    console.log('Ready!');
 });
 const help_embed = new Discord.MessageEmbed()
     .setTitle('Autismo Help')
@@ -28,94 +33,96 @@ const help_embed = new Discord.MessageEmbed()
     .addField('Ping', 'API latency and bot latency, bot latency not 100% accurate.')
     .addField('Prefix', 'Sets server prefix, or tells prefix if no prefix.')
     .addField('Subreddit', 'sends a random post from that subreddit.')
-    .addField('Wolfram', 'asks wolfram|alpha for the answer.')
-    .addField('Server(un)ban', 'locally bans user from bot.')
     .addField('(Un)ban', 'bans user mentioned from server.')
     .addField('Kick', 'kicks user mentioned from server.')
     .addField('Contact AutisticMOFO#1337', 'for more details.')
-client.once('ready', () => {
-    console.log('Ready!');
-});
-var messagecount;
-const users = JSON.parse(fs.readFileSync('users.json'));
-const serverPrefix = require("./server-prefix.json");
-const bannedusers = JSON.parse(fs.readFileSync('banned-users.json'));
 client.login(token.token);
 client.on('message', message => {
-    const users = JSON.parse(fs.readFileSync('users.json'));
-    const serverPrefix = require("./server-prefix.json");
-    const bannedusers = JSON.parse(fs.readFileSync('banned-users.json'));
-    if (message.author.id == 846770297989365822) {
+    var user = message.author.id;
+    var guild = message.guild.id;
+    var userInfo = db.get("userDB");
+    var serverInfo = db.get("serverDB");
+    switch (db.has("userDB")) {
+        case (false):
+            db.set("userDB", {})
+    }
+    switch (db.has("serverDB")) {
+        case (false):
+            db.set("serverDB", {})
+    }
+    var guild = message.guild.id;
+    var user = message.author.id;
+    if (userInfo.hasOwnProperty(user) != true) {
+        userInfo[user] = { "banned": false };
+        db.set("userDB", userInfo);
+    }
+    if (serverInfo.hasOwnProperty(guild)) {
+        if (serverInfo[guild].hasOwnProperty(user) != true) {
+            serverInfo[guild].users[user] = { "banned": false, "muted": false }
+            db.set("serverDB", serverInfo);
+        }
     } else {
-        messagecount++;
-        var author = message.author.id;
-        var guild = message.guild.id;
-        if (users.hasOwnProperty(guild)) {
-            if (users[guild].hasOwnProperty(author)) {
+        serverInfo[guild] = { "prefix": "a!" };
+        serverInfo[guild][user] = { "banned": false, "muted": false }
+        db.set("serverDB", serverInfo);
+    }
+    console.log("done with user checking");
+    var prefix = serverInfo[guild].prefix;
+    if (!message.content.startsWith(prefix)) return;
+    console.log("Message_important");
+    const args = message.content.slice(prefix.length).trim().split(/ +/g)
+    switch (args[0]) {
+        case 'ping':
+            message.channel.send(`Latency is ${Date.now() - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms.`);
+            break;
+        case 'test':
+            message.channel.send('Why not just use ping?');
+            message.channel.send('While your here, https://github.com/Oman395')
+            break;
+        case 'joke':
+            let jokes = Memer.joke();
+            message.channel.send(jokes);
+            break;
+        case 'help':
+            message.channel.send(help_embed);
+            break;
+        case '404':
+            message.channel.send("Once upon a midnight dreary, While i porn surfed, weak and weary, Over many a strange and spurious site of hot xxx galore. While i clicked my fav'rite bookmark, suddenly there came a warning, And my heart was filled with mourning, mourning for my fear amour, 'Tis not possible!', i muttered, 'give me back my free hardcore!' Quoth the server... '404'");
+            break
+        case 'kick':
+            if (message.mentions.members.first()) {
+                if (message.member.hasPermission("MANAGE_MESSAGES")) {
+                    message.mentions.members.first().kick();
+                    message.channel.send("Kicked!");
+                } else {
+                    message.channel.send("Sorry, you dont have the permissions.");
+                }
             } else {
-                users[guild][author] = true;
-                fs.writeFile('users.json', JSON.stringify(users), function (err, result) {
-                    if (err) console.log('error', err);
-                });
+                message.channel.send("Sorry, no user specified.");
             }
-        } else {
-            users[guild] = {};
-            users[guild][author] = true;
-            fs.writeFile('users.json', JSON.stringify(users), function (err, result) {
-                if (err) console.log('error', err);
-            });
-        }
-        if (serverPrefix.hasOwnProperty(guild) == true) {
-            var prefix = serverPrefix[guild];
-        } else {
-            serverPrefix[guild] = "!";
-            fs.writeFile('server-prefix.json', JSON.stringify(bannedusers), function (err, result) {
-                if (err) console.log('error', err);
-            });
-            var prefix = serverPrefix[guild];
-        }
-        if (!message.content.startsWith(prefix)) return;
-        const args = message.content.slice(prefix.length).trim().split(/ +/g)
-        if (bannedusers.hasOwnProperty("<@" + author + ">") == true || users[guild][author] == false) {
-            message.channel.send("Sorry, you are banned from using this bot. Contact AutisticMOFO#1337 for more details.");
-        } else {
-            var unbanid = message.mentions.members.first();
-            const args = message.content.slice(prefix.length).trim().split(/ +/);
-            const command = args.shift().toLowerCase();
-            switch (command) {
-                case 'ping':
-                    message.channel.send(`Latency is ${Date.now() - message.createdTimestamp}ms. API Latency is ${Math.round(client.ws.ping)}ms.`);
-                    break;
-                case 'test':
-                    message.channel.send('Why not just use ping?');
-                    message.channel.send('While your here, https://github.com/Oman395')
-                    break;
-                case 'joke':
-                    let jokes = Memer.joke();
-                    message.channel.send(jokes);
-                    break;
-                case 'help':
-                    message.channel.send(help_embed);
-                    break;
-                case '404':
-                    message.channel.send("Once upon a midnight dreary, While i porn surfed, weak and weary, Over many a strange and spurious site of hot xxx galore. While i clicked my fav'rite bookmark, suddenly there came a warning, And my heart was filled with mourning, mourning for my fear amour, 'Tis not possible!', i muttered, 'give me back my free hardcore!' Quoth the server... '404'");
-                    break
-            }
-            if (message.content.startsWith(prefix + "ban ")) {
-                if (message.mentions.members.first()) {
-                    if (message.member.hasPermission("BAN_MEMBERS")) {
+            break;
+        case 'ban':
+            if (message.mentions.members.first()) {
+                if (message.member.hasPermission("BAN_MEMBERS")) {
+                    try {
                         message.mentions.members.first().ban();
                         message.channel.send("Banned!");
-                    } else {
-                        message.channel.send("Sorry, you dont have the permissions.");
+                        serverInfo[guild][users][user].banned = true;
+                    } catch (e) {
+                        console.error(e);
+                        message.channel.send("Sorry, there was an eror. Or that user cant be banned. Or you tried to ban yourself. I cant tell because my programmer is la- very good at what he does and also can kill me at any moment");
                     }
                 } else {
-                    message.channel.send("Sorry, no user specified.");
+                    message.channel.send("Sorry, you dont have the permissions.");
                 }
+            } else {
+                message.channel.send("Sorry, no user specified.");
             }
-            if (message.content.startsWith(prefix + "unban ")) {
+            break;
+        case 'unban':
+            async function doShit() {
                 if (message.member.hasPermission("BAN_MEMBERS")) {
-                    let userID = args[0];
+                    let userID = args[1];
                     userID = userID.substring(3);
                     userID = userID.substring(0, userID.length - 1);
                     if (!userID) return message.reply("Please specify the user ID you wish to unban!")
@@ -124,14 +131,11 @@ client.on('message', message => {
                             if (bans.size === 0) {
                                 return message.reply("There is no users banned!")
                             } else {
-                                try {
-                                    message.guild.members.unban(userID);
-                                    message.channel.send("Unbanned!");
-                                } catch {
-                                    message.channel.send("Error. Either you messed up or I messed up, but the dev is too lazy to figure it out.")
-                                }
+                                console.log(userID);
+                                message.guild.members.unban(userID);
+                                message.channel.send("Unbanned!");
                             }
-                        })
+                        });
                     } catch (err) {
                         console.log(err)
                     }
@@ -139,114 +143,39 @@ client.on('message', message => {
                     message.channel.send("Sorry, you dont have the permissions.");
                 }
             }
-            if (message.content.startsWith(prefix + "kick ")) {
-                if (message.mentions.members.first()) {
-                    if (message.member.hasPermission("MANAGE_MESSAGES")) {
-                        message.mentions.members.first().kick();
-                        message.channel.send("Kicked!");
-                    } else {
-                        message.channel.send("Sorry, you dont have the permissions.");
-                    }
-                } else {
-                    message.channel.send("Sorry, no user specified.");
-                }
-            }
-            if (message.content.startsWith(prefix + "say ")) {
-                var saything = message.content.slice(prefix.length + 4);
-                message.channel.send(String(saything));
-            }
-            if (message.content.startsWith(prefix + "wolfram ")) {
-                async function doShit() {
-                    var input = message.content.slice(prefix.length + 8);
-                    try {
-                        var result = (await waApi.getShort(input));
-                        message.channel.send(result).then(console.log(result));
-                    } catch (error) {
-                        console.error(error);
-                        message.channel.send("Sorry, I didn't understand that. Or maybe wolfram is having a stroke.");
-                    }
-                }
-                doShit();
-            }
-            if (message.content.startsWith(prefix + "prefix ")) {
-                var newPrefix = message.content.slice(prefix.length + 7);
-                serverPrefix[guild] = newPrefix;
-                fs.writeFile('server-prefix.json', JSON.stringify(serverPrefix), function (err, result) {
-                    if (err) console.log('error', err);
-                });
+            doShit();
+            break;
+        case 'prefix':
+            if (args[1]) {
+                var newPrefix = args[1];
+                serverInfo[guild].prefix = newPrefix;
                 message.channel.send('"' + newPrefix + '" is the new prefix!');
             }
-            if (message.content.startsWith(prefix + "subreddit ")) {
-                var subreddit = message.content.slice(prefix.length + 10);
-                async function theresABetterWayButNo() {
-                    var media = await r.getRandomSubmission(subreddit).permalink;
-                    message.channel.send("https://www.reddit.com" + media);
-                }
-                theresABetterWayButNo();
+            break;
+        case 'subreddit':
+            var subreddit = message.content.slice(prefix.length + 10);
+            async function theresABetterWayButNo() {
+                var media = await r.getRandomSubmission(subreddit).permalink;
+                message.channel.send("https://www.reddit.com" + media);
             }
-            if (message.content.startsWith(prefix + "botban ")) {
-                if (message.author.id == 616296179302400001) {
-                    const banId = message.mentions.members.first();
-                    if (bannedusers.hasOwnProperty(banId) == false) {
-                        bannedusers[banId] = "true"
-                        fs.writeFile('banned-users.json', JSON.stringify(bannedusers), function (err, result) {
-                            if (err) console.log('error', err);
-                        });
-                        message.channel.send(banId + " banned!");
-                    } else {
-                        message.channel.send('Sorry, ' + banId + ' is already banned!');
-                    }
-                }
-            }
-            if (message.content.startsWith(prefix + "botunban ")) {
-                if (message.author.id == 616296179302400001) {
-                    var unbanId = message.mentions.members.first();
-                    unbanId = "<@" + unbanId + ">";
-                    if (bannedusers.hasOwnProperty(unbanId)) {
-                        delete bannedusers[unbanId];
-                        fs.writeFile('banned-users.json', JSON.stringify(bannedusers), function (err, result) {
-                            if (err) console.log('error', err);
-                        });
-                        message.channel.send(message.mentions.members.first() + " unbanned!");
-                    } else {
-                        message.channel.send("I'm sorry dave, I can't do that.");
-                    }
-                }
-            }
-            if (message.content.startsWith(prefix + "serverban ")) {
-                if (message.member.hasPermission("ADMINISTRATOR")) {
-                    const guildcurrent = users[guild];
-                    const banfucker = guildcurrent[unbanid.id];
-                    if (banfucker == true) {
-                        users[guild][unbanid.id] = false;
-                        fs.writeFile('users.json', JSON.stringify(users), function (err, result) {
-                            if (err) console.log('error', err);
-                        });
-                        message.channel.send("Banned!");
-                    } else {
-                        message.channel.send("Sorry, that user is already banned.");
-                    }
+            theresABetterWayButNo();
+            break;
+        case 'botban':
+            if (message.author.id == 616296179302400001) {
+                var unbanId = message.mentions.members.first();
+                unbanId = "<@" + unbanId + ">";
+                if (bannedusers.hasOwnProperty(unbanId)) {
+                    delete bannedusers[unbanId];
+                    fs.writeFile('banned-users.json', JSON.stringify(bannedusers), function (err, result) {
+                        if (err) console.log('error', err);
+                    });
+                    message.channel.send(message.mentions.members.first() + " unbanned!");
                 } else {
                     message.channel.send("I'm sorry dave, I can't do that.");
                 }
             }
-            if (message.content.startsWith(prefix + "serverunban ")) {
-                if (message.member.hasPermission("ADMINISTRATOR")) {
-                    const guildcurrent = users[guild];
-                    const banfucker = guildcurrent[unbanid.id];
-                    if (banfucker == false) {
-                        users[guild][unbanid.id] = true;
-                        fs.writeFile('users.json', JSON.stringify(users), function (err, result) {
-                            if (err) console.log('error', err);
-                        });
-                        message.channel.send("Unbanned!");
-                    } else {
-                        message.channel.send("Sorry, that user is not banned.");
-                    }
-                } else {
-                    message.channel.send("I'm sorry dave, I can't do that.");
-                }
-            }
-        }
+            break;
     }
+    db.set("serverDB", serverInfo);
+    db.set("userDB", userInfo);
 });
